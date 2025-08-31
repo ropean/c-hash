@@ -320,11 +320,18 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, LPWSTR, int nCmdShow) {
 	wc.lpszClassName = kWndClass;
 	wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
 	wc.hbrBackground = (HBRUSH)(COLOR_WINDOW+1);
+	wc.hIcon = (HICON)LoadImageW(hInstance, L"IDI_ICON1", IMAGE_ICON, 0, 0, LR_DEFAULTSIZE);
 	RegisterClassW(&wc);
 
 	HWND hwnd = CreateWindowExW(0, kWndClass, L"c-hash", WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
 		CW_USEDEFAULT, CW_USEDEFAULT, 740, 240, nullptr, nullptr, hInstance, nullptr);
 	if (!hwnd) return 1;
+	{
+		HICON hIconBig = (HICON)LoadImageW(hInstance, L"IDI_ICON1", IMAGE_ICON, 0, 0, LR_DEFAULTSIZE);
+		HICON hIconSmall = (HICON)LoadImageW(hInstance, L"IDI_ICON1", IMAGE_ICON, 16, 16, 0);
+		if (hIconBig) SendMessageW(hwnd, WM_SETICON, ICON_BIG, (LPARAM)hIconBig);
+		if (hIconSmall) SendMessageW(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)hIconSmall);
+	}
 	ShowWindow(hwnd, nCmdShow);
 	UpdateWindow(hwnd);
 
