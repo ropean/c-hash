@@ -1,0 +1,35 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install UPX
+        run: choco install upx -y
+
+      - name: Build (MSVC + UPX)
+        shell: cmd
+        run: scripts\build-msvc-upx.cmd
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: c-hash-windows-msvc
+          path: build-msvc/Release/c-hash.exe
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build-msvc/Release/c-hash.exe
