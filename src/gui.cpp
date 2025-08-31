@@ -58,6 +58,21 @@ static void SetUiBusy(HWND hwnd, bool busy) {
 	}
 }
 
+static void CenterWindowOnMonitor(HWND hwnd) {
+	RECT rc{};
+	if (!GetWindowRect(hwnd, &rc)) return;
+	HMONITOR mon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+	MONITORINFO mi{}; mi.cbSize = sizeof(mi);
+	if (!GetMonitorInfoW(mon, &mi)) return;
+	int w = rc.right - rc.left;
+	int h = rc.bottom - rc.top;
+	int workW = mi.rcWork.right - mi.rcWork.left;
+	int workH = mi.rcWork.bottom - mi.rcWork.top;
+	int x = mi.rcWork.left + (workW - w) / 2;
+	int y = mi.rcWork.top + (workH - h) / 2;
+	SetWindowPos(hwnd, nullptr, x, y, 0, 0, SWP_NOZORDER | SWP_NOSIZE);
+}
+
 static std::wstring Utf8ToWide(const std::string &s) {
 	if (s.empty()) return L"";
 	int len = MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), nullptr, 0);
@@ -332,6 +347,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, LPWSTR, int nCmdShow) {
 		if (hIconBig) SendMessageW(hwnd, WM_SETICON, ICON_BIG, (LPARAM)hIconBig);
 		if (hIconSmall) SendMessageW(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)hIconSmall);
 	}
+	CenterWindowOnMonitor(hwnd);
 	ShowWindow(hwnd, nCmdShow);
 	UpdateWindow(hwnd);
 
