@@ -54,7 +54,8 @@ static void DoHash(HWND hwnd) {
 	g_state.b64Out = Utf8ToWide(b64);
 	g_state.sizeOut = std::to_wstring(sizeBytes) + L" bytes";
 	{
-		std::wstringstream ss; ss << elapsed; g_state.elapsedOut = ss.str() + L" s";
+		long long ms = (long long)(elapsed * 1000.0 + 0.5);
+		g_state.elapsedOut = std::to_wstring(ms) + L" ms";
 	}
 	{
 		std::wstringstream ss; ss << thr; g_state.throughputOut = ss.str() + L" MiB/s";
@@ -100,28 +101,28 @@ static void CopyToClipboard(HWND hwnd, const std::wstring &text) {
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 	switch (msg) {
 	case WM_CREATE: {
-		CreateWindowW(L"STATIC", L"Path:", WS_CHILD | WS_VISIBLE, 10, 10, 40, 20, hwnd, nullptr, nullptr, nullptr);
-		CreateWindowW(L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL, 60, 10, 510, 24, hwnd, (HMENU)100, nullptr, nullptr);
+		CreateWindowW(L"STATIC", L"Path:", WS_CHILD | WS_VISIBLE, 10, 10, 80, 20, hwnd, nullptr, nullptr, nullptr);
+		CreateWindowW(L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL, 100, 10, 470, 24, hwnd, (HMENU)100, nullptr, nullptr);
 		CreateWindowW(L"BUTTON", L"Browse", WS_CHILD | WS_VISIBLE, 580, 10, 60, 24, hwnd, (HMENU)200, nullptr, nullptr);
 		CreateWindowW(L"BUTTON", L"Clear", WS_CHILD | WS_VISIBLE, 650, 10, 60, 24, hwnd, (HMENU)202, nullptr, nullptr);
-		CreateWindowW(L"BUTTON", L"Uppercase HEX", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 10, 44, 130, 20, hwnd, (HMENU)203, nullptr, nullptr);
+		CreateWindowW(L"BUTTON", L"Uppercase HEX", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 100, 44, 130, 20, hwnd, (HMENU)203, nullptr, nullptr);
 
-		CreateWindowW(L"STATIC", L"HEX:", WS_CHILD | WS_VISIBLE, 10, 74, 70, 20, hwnd, nullptr, nullptr, nullptr);
-		CreateWindowW(L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL | ES_READONLY, 90, 74, 560, 24, hwnd, (HMENU)101, nullptr, nullptr);
+		CreateWindowW(L"STATIC", L"HEX:", WS_CHILD | WS_VISIBLE, 10, 74, 80, 20, hwnd, nullptr, nullptr, nullptr);
+		CreateWindowW(L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL | ES_READONLY, 100, 74, 550, 24, hwnd, (HMENU)101, nullptr, nullptr);
 		CreateWindowW(L"BUTTON", L"Copy", WS_CHILD | WS_VISIBLE, 660, 74, 60, 24, hwnd, (HMENU)204, nullptr, nullptr);
 
-		CreateWindowW(L"STATIC", L"Base64:", WS_CHILD | WS_VISIBLE, 10, 104, 70, 20, hwnd, nullptr, nullptr, nullptr);
-		CreateWindowW(L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL | ES_READONLY, 90, 104, 560, 24, hwnd, (HMENU)102, nullptr, nullptr);
+		CreateWindowW(L"STATIC", L"Base64:", WS_CHILD | WS_VISIBLE, 10, 104, 80, 20, hwnd, nullptr, nullptr, nullptr);
+		CreateWindowW(L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL | ES_READONLY, 100, 104, 550, 24, hwnd, (HMENU)102, nullptr, nullptr);
 		CreateWindowW(L"BUTTON", L"Copy", WS_CHILD | WS_VISIBLE, 660, 104, 60, 24, hwnd, (HMENU)205, nullptr, nullptr);
 
-		CreateWindowW(L"STATIC", L"Size:", WS_CHILD | WS_VISIBLE, 10, 134, 70, 20, hwnd, nullptr, nullptr, nullptr);
-		CreateWindowW(L"STATIC", L"", WS_CHILD | WS_VISIBLE, 90, 134, 300, 20, hwnd, (HMENU)103, nullptr, nullptr);
+		CreateWindowW(L"STATIC", L"Size:", WS_CHILD | WS_VISIBLE, 10, 134, 80, 20, hwnd, nullptr, nullptr, nullptr);
+		CreateWindowW(L"STATIC", L"", WS_CHILD | WS_VISIBLE, 100, 134, 300, 20, hwnd, (HMENU)103, nullptr, nullptr);
 
-		CreateWindowW(L"STATIC", L"Elapsed:", WS_CHILD | WS_VISIBLE, 10, 154, 70, 20, hwnd, nullptr, nullptr, nullptr);
-		CreateWindowW(L"STATIC", L"", WS_CHILD | WS_VISIBLE, 90, 154, 300, 20, hwnd, (HMENU)104, nullptr, nullptr);
+		CreateWindowW(L"STATIC", L"Elapsed:", WS_CHILD | WS_VISIBLE, 10, 154, 80, 20, hwnd, nullptr, nullptr, nullptr);
+		CreateWindowW(L"STATIC", L"", WS_CHILD | WS_VISIBLE, 100, 154, 300, 20, hwnd, (HMENU)104, nullptr, nullptr);
 
-		CreateWindowW(L"STATIC", L"Throughput:", WS_CHILD | WS_VISIBLE, 10, 174, 70, 20, hwnd, nullptr, nullptr, nullptr);
-		CreateWindowW(L"STATIC", L"", WS_CHILD | WS_VISIBLE, 90, 174, 300, 20, hwnd, (HMENU)105, nullptr, nullptr);
+		CreateWindowW(L"STATIC", L"Throughput:", WS_CHILD | WS_VISIBLE, 10, 174, 80, 20, hwnd, nullptr, nullptr, nullptr);
+		CreateWindowW(L"STATIC", L"", WS_CHILD | WS_VISIBLE, 100, 174, 300, 20, hwnd, (HMENU)105, nullptr, nullptr);
 
 		DragAcceptFiles(hwnd, TRUE);
 		return 0;
@@ -159,6 +160,11 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 		DragFinish(hDrop);
 		return 0;
 	}
+	case WM_CTLCOLORSTATIC: {
+		HDC hdc = (HDC)wParam;
+		SetBkMode(hdc, TRANSPARENT);
+		return (LRESULT)(HBRUSH)(COLOR_WINDOW+1);
+	}
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		return 0;
@@ -172,6 +178,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, LPWSTR, int nCmdShow) {
 	wc.hInstance = hInstance;
 	wc.lpszClassName = kWndClass;
 	wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+	wc.hbrBackground = (HBRUSH)(COLOR_WINDOW+1);
 	RegisterClassW(&wc);
 
 	HWND hwnd = CreateWindowExW(0, kWndClass, L"c-hash (GUI)", WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
