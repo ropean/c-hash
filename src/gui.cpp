@@ -45,6 +45,19 @@ static void SetControlText(HWND hwnd, int ctrlId, const std::wstring &text) {
 	SetWindowTextW(GetDlgItem(hwnd, ctrlId), text.c_str());
 }
 
+static void SetUiBusy(HWND hwnd, bool busy) {
+	int interactiveIds[] = {100, 200, 202, 203, 101, 102, 204, 205};
+	for (int id : interactiveIds) {
+		HWND h = GetDlgItem(hwnd, id);
+		if (h) EnableWindow(h, busy ? FALSE : TRUE);
+	}
+	if (busy) {
+		SetWindowTextW(hwnd, L"c-hash — Hashing...");
+	} else {
+		SetWindowTextW(hwnd, L"c-hash");
+	}
+}
+
 static std::wstring Utf8ToWide(const std::string &s) {
 	if (s.empty()) return L"";
 	int len = MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), nullptr, 0);
@@ -155,6 +168,7 @@ static void StartHash(HWND hwnd) {
 	g_state.isHashing = true;
 	g_state.hasDigest = false;
 	std::wstring path = g_state.selectedPath;
+	SetUiBusy(hwnd, true);
 	std::thread([hwnd, path]() {
 		HashResult *res = new HashResult();
 		res->path = path;
@@ -257,6 +271,10 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 	case WM_DROPFILES: {
 		HDROP hDrop = (HDROP)wParam;
 		wchar_t path[MAX_PATH];
+		if (g_state.isHashing) {
+			DragFinish(hDrop);
+			return 0;
+		}
 		if (DragQueryFileW(hDrop, 0, path, MAX_PATH)) {
 			g_state.selectedPath = path;
 			SetControlText(hwnd, 100, g_state.selectedPath);
@@ -280,6 +298,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 			}
 			delete res;
 		}
+		SetUiBusy(hwnd, false);
 		return 0;
 	}
 	case WM_CTLCOLORSTATIC: {
@@ -303,7 +322,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, LPWSTR, int nCmdShow) {
 	wc.hbrBackground = (HBRUSH)(COLOR_WINDOW+1);
 	RegisterClassW(&wc);
 
-	HWND hwnd = CreateWindowExW(0, kWndClass, L"c-hash (GUI)", WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
+	HWND hwnd = CreateWindowExW(0, kWndClass, L"c-hash", WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
 		CW_USEDEFAULT, CW_USEDEFAULT, 740, 240, nullptr, nullptr, hInstance, nullptr);
 	if (!hwnd) return 1;
 	ShowWindow(hwnd, nCmdShow);
