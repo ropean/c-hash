@@ -1,6 +1,6 @@
 # c-hash
 
-Windows C++ GUI hasher mirroring the logic and UX of `c-hash`. Computes SHA-256 via Windows CNG with streamed I/O and a minimal Win32 UI.
+Windows C++ GUI hasher, computes SHA-256 via Windows CNG with streamed I/O and a minimal Win32 UI.
 
 Features
 

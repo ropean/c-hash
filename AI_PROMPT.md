@@ -1,6 +1,6 @@
 ## Project overview
 
-This repository contains a Windows-only C++ application, c-hash, that computes SHA-256 hashes for files using a streamed approach. The primary deliverable is a minimal, fast, and user-friendly Win32 GUI that mirrors the logic and UX of a reference Rust GUI app (c-hash).
+This repository contains a Windows-only C++ application, c-hash, that computes SHA-256 hashes for files using a streamed approach. The primary deliverable is a minimal, fast, and user-friendly Win32 GUI.
 
 - Platform: Windows 10/11
 - Language/Standard: C++17
