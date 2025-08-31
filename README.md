@@ -46,6 +46,14 @@ Build
   scripts\build-msvc-upx.cmd
   ```
 
+Clean
+
+```bat
+scripts\clean.cmd
+```
+
+This removes build dirs created by all scripts: `build`, `build-msvc`, `build-mingw`, `build-ninja-msvc`, `build-ninja-mingw`, plus in-source CMake/VS/Ninja files.
+
 Configuration
 
 - Optional icon embedding:
