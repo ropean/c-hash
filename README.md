@@ -1,45 +1,59 @@
 # c-hash
 
-Minimal Windows C++ CLI hasher mirroring the logic of `rust-hash`.
+Windows C++ GUI hasher mirroring the logic and UX of `c-hash`. Computes SHA-256 via Windows CNG with streamed I/O and a minimal Win32 UI.
 
 Features
 
 - Streamed SHA-256 hashing (1 MiB buffer)
-- HEX output with optional uppercase `-u`
-- Base64 output of raw digest
-- Shows file size, elapsed time, and approximate throughput
+- HEX output (uppercase toggle), Base64 output of raw digest
+- Size, elapsed, throughput with human-friendly units and thousands separators
+- Drag & drop, Browse, Copy buttons, Uppercase toggle alignment
+- Non-blocking background hashing with UI busy state and title tip
+- Centered startup window, embedded icon and version info
 
-Build (CMake + MSVC)
+Build
 
-```bat
-cd c-hash
-cmake -S . -B build -G "Visual Studio 17 2022" -A x64
-cmake --build build --config Release
-```
+- MSVC (Visual Studio 2022):
 
-Run
+  ```bat
+  scripts\build-msvc.cmd
+  start build-msvc\Release\c-hash.exe
+  ```
 
-```bat
-build\Release\c-hash.exe [-u] <file_path>
-```
+- MinGW (Makefiles):
 
-Example
+  ```bat
+  scripts\build-mingw.cmd
+  start build-mingw\c-hash.exe
+  ```
 
-```bat
-build\Release\c-hash.exe -u C:\\Windows\\notepad.exe
-```
+- Ninja + MSVC:
+
+  ```bat
+  scripts\build-ninja-msvc.cmd
+  start build-ninja-msvc\Release\c-hash.exe
+  ```
+
+- Ninja + MinGW:
+
+  ```bat
+  scripts\build-ninja-mingw.cmd
+  start build-ninja-mingw\c-hash.exe
+  ```
+
+- MSVC + UPX compression:
+  ```bat
+  scripts\build-msvc-upx.cmd
+  ```
+
+Configuration
+
+- Optional icon embedding:
+  - Provide an `.ico` via CMake cache var `APP_ICON` or place `assets\app.ico` in the repo; the build will embed it.
 
 Notes
 
-- Uses Windows CNG (`bcrypt`) for SHA-256; no external dependencies.
-- Throughput uses file size and wall-clock; it is approximate.
+- Windows-only; uses Windows CNG (`bcrypt`) and raw Win32 APIs.
+- Throughput is approximate (based on file size and wall-clock).
 
-MinGW-w64 (WinLibs) Build
-
-```bat
-scripts\build-mingw.cmd
-```
-
-- The script attempts to copy the icon from `rust-hash` (via `.cargo/config.toml` `APP_ICON` if present),
-  falls back to `assets\app.ico` if found, and embeds it automatically.
-- Output: `build-mingw\c-hash.exe`
+For a deep, structured overview (architecture, UX, extensibility), see `AI_PROMPT.md`.
