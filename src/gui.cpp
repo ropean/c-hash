@@ -5,6 +5,8 @@
 #include <string_view>
 #include <filesystem>
 #include <sstream>
+#include <iomanip>
+#include <algorithm>
 #include "hash.hpp"
 
 namespace fs = std::filesystem;
@@ -35,6 +37,88 @@ static std::wstring Utf8ToWide(const std::string &s) {
 	return w;
 }
 
+static std::wstring InsertThousandsSeparators(const std::wstring &digits) {
+	if (digits.empty()) return digits;
+	std::wstring intpart = digits;
+	bool neg = false;
+	if (intpart.size() > 0 && intpart[0] == L'-') {
+		neg = true;
+		intpart.erase(intpart.begin());
+	}
+	std::wstring out;
+	int count = 0;
+	for (int i = (int)intpart.size() - 1; i >= 0; --i) {
+		out.push_back(intpart[(size_t)i]);
+		++count;
+		if (count == 3 && i > 0) {
+			out.push_back(L',');
+			count = 0;
+		}
+	}
+	std::reverse(out.begin(), out.end());
+	if (neg) out.insert(out.begin(), L'-');
+	return out;
+}
+
+static std::wstring FormatNumberWithCommas(double value, int decimals) {
+	std::wstringstream ss;
+	ss.setf(std::ios::fixed); ss << std::setprecision(decimals) << value;
+	std::wstring s = ss.str();
+	size_t dot = s.find(L'.');
+	std::wstring intpart = dot == std::wstring::npos ? s : s.substr(0, dot);
+	std::wstring fracpart = dot == std::wstring::npos ? L"" : s.substr(dot + 1);
+	intpart = InsertThousandsSeparators(intpart);
+	if (!fracpart.empty()) {
+		// trim trailing zeros
+		while (!fracpart.empty() && fracpart.back() == L'0') fracpart.pop_back();
+	}
+	if (fracpart.empty()) return intpart;
+	return intpart + L"." + fracpart;
+}
+
+static std::wstring FormatSize(uint64_t bytes) {
+	const double b = (double)bytes;
+	if (b >= 1e9) {
+		double v = b / 1e9;
+		return FormatNumberWithCommas(v, 2) + L" GB";
+	} else if (b >= 1e6) {
+		double v = b / 1e6;
+		return FormatNumberWithCommas(v, 2) + L" MB";
+	} else {
+		return InsertThousandsSeparators(std::to_wstring(bytes)) + L" bytes";
+	}
+}
+
+static std::wstring FormatElapsed(double seconds) {
+	if (seconds < 1.0) {
+		double ms = seconds * 1000.0;
+		return FormatNumberWithCommas(ms, 2) + L" ms";
+	} else if (seconds < 60.0) {
+		return FormatNumberWithCommas(seconds, 2) + L" s";
+	} else if (seconds < 3600.0) {
+		double m = seconds / 60.0;
+		return FormatNumberWithCommas(m, 2) + L" m";
+	} else {
+		double h = seconds / 3600.0;
+		return FormatNumberWithCommas(h, 2) + L" h";
+	}
+}
+
+static std::wstring FormatThroughput(uint64_t bytes, double seconds) {
+	if (seconds <= 0.0) return L"0 KB/s";
+	double bps = (double)bytes / seconds; // bytes per second
+	if (bps >= 1e9) {
+		double v = bps / 1e9;
+		return FormatNumberWithCommas(v, 2) + L" GB/s";
+	} else if (bps >= 1e6) {
+		double v = bps / 1e6;
+		return FormatNumberWithCommas(v, 2) + L" MB/s";
+	} else {
+		double v = bps / 1e3;
+		return FormatNumberWithCommas(v, 2) + L" KB/s";
+	}
+}
+
 static void DoHash(HWND hwnd) {
 	if (g_state.selectedPath.empty()) return;
 	hashcore::Sha256Digest digest{};
@@ -52,14 +136,9 @@ static void DoHash(HWND hwnd) {
 
 	g_state.hexOut = Utf8ToWide(hex);
 	g_state.b64Out = Utf8ToWide(b64);
-	g_state.sizeOut = std::to_wstring(sizeBytes) + L" bytes";
-	{
-		long long ms = (long long)(elapsed * 1000.0 + 0.5);
-		g_state.elapsedOut = std::to_wstring(ms) + L" ms";
-	}
-	{
-		std::wstringstream ss; ss << thr; g_state.throughputOut = ss.str() + L" MiB/s";
-	}
+	g_state.sizeOut = FormatSize(sizeBytes);
+	g_state.elapsedOut = FormatElapsed(elapsed);
+	g_state.throughputOut = FormatThroughput(sizeBytes, elapsed);
 
 	SetControlText(hwnd, 101, g_state.hexOut);
 	SetControlText(hwnd, 102, g_state.b64Out);
