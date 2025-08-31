@@ -56,9 +56,17 @@ static void SetUiBusy(HWND hwnd, bool busy) {
 	HWND cancelBtn = GetDlgItem(hwnd, 206);
 	if (cancelBtn) EnableWindow(cancelBtn, busy ? TRUE : FALSE);
 	if (busy) {
+		#ifdef APP_TITLE_W
+		SetWindowTextW(hwnd, APP_TITLE_W L" — Hashing...");
+		#else
 		SetWindowTextW(hwnd, L"c-hash — Hashing...");
+		#endif
 	} else {
+		#ifdef APP_TITLE_W
+		SetWindowTextW(hwnd, APP_TITLE_W);
+		#else
 		SetWindowTextW(hwnd, L"c-hash");
+		#endif
 	}
 }
 
@@ -337,7 +345,11 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 		unsigned long p100 = (unsigned long)wParam;
 		double percent = (double)p100 / 100.0;
 		wchar_t buf[128];
+		#ifdef APP_TITLE_W
+		swprintf(buf, 128, APP_TITLE_W L" — Hashing... %.2f%%", percent);
+		#else
 		swprintf(buf, 128, L"c-hash — Hashing... %.2f%%", percent);
+		#endif
 		SetWindowTextW(hwnd, buf);
 		return 0;
 	}
@@ -389,7 +401,11 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, LPWSTR, int nCmdShow) {
 	wc.hIcon = (HICON)LoadImageW(hInstance, L"IDI_ICON1", IMAGE_ICON, 0, 0, LR_DEFAULTSIZE);
 	RegisterClassW(&wc);
 
+	#ifdef APP_TITLE_W
+	HWND hwnd = CreateWindowExW(0, kWndClass, APP_TITLE_W, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
+	#else
 	HWND hwnd = CreateWindowExW(0, kWndClass, L"c-hash", WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
+	#endif
 		CW_USEDEFAULT, CW_USEDEFAULT, 740, 240, nullptr, nullptr, hInstance, nullptr);
 	if (!hwnd) return 1;
 	{
