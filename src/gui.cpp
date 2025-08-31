@@ -7,6 +7,7 @@
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
+#include <thread>
 #include "hash.hpp"
 
 namespace fs = std::filesystem;
@@ -21,9 +22,24 @@ struct UiState {
 	std::wstring sizeOut;
 	std::wstring elapsedOut;
 	std::wstring throughputOut;
+	bool isHashing = false;
+	bool hasDigest = false;
+	hashcore::Sha256Digest lastDigest{};
+	uint64_t lastSizeBytes = 0;
+	double lastElapsedSeconds = 0.0;
 };
 
 static UiState g_state{};
+static const UINT WM_HASH_DONE = WM_APP + 1;
+
+struct HashResult {
+	bool success = false;
+	std::wstring path;
+	hashcore::Sha256Digest digest{};
+	uint64_t sizeBytes = 0;
+	double elapsedSeconds = 0.0;
+	std::string error;
+};
 
 static void SetControlText(HWND hwnd, int ctrlId, const std::wstring &text) {
 	SetWindowTextW(GetDlgItem(hwnd, ctrlId), text.c_str());
@@ -119,32 +135,38 @@ static std::wstring FormatThroughput(uint64_t bytes, double seconds) {
 	}
 }
 
-static void DoHash(HWND hwnd) {
-	if (g_state.selectedPath.empty()) return;
-	hashcore::Sha256Digest digest{};
-	uint64_t sizeBytes = 0;
-	double elapsed = 0.0;
-	std::string err;
-	if (!hashcore::compute_sha256_streamed(g_state.selectedPath, digest, sizeBytes, elapsed, err)) {
-		MessageBoxW(hwnd, Utf8ToWide(err).c_str(), L"Error", MB_ICONERROR);
-		return;
-	}
-	std::string hex = hashcore::to_hex(digest, g_state.uppercaseHex);
-	std::string b64 = hashcore::to_base64(digest);
-	double mb = (double)sizeBytes / (1024.0 * 1024.0);
-	double thr = elapsed > 0.0 ? (mb / elapsed) : 0.0;
-
+static void ApplyOutputs(HWND hwnd) {
+	std::string hex = hashcore::to_hex(g_state.lastDigest, g_state.uppercaseHex);
+	std::string b64 = hashcore::to_base64(g_state.lastDigest);
 	g_state.hexOut = Utf8ToWide(hex);
 	g_state.b64Out = Utf8ToWide(b64);
-	g_state.sizeOut = FormatSize(sizeBytes);
-	g_state.elapsedOut = FormatElapsed(elapsed);
-	g_state.throughputOut = FormatThroughput(sizeBytes, elapsed);
-
+	g_state.sizeOut = FormatSize(g_state.lastSizeBytes);
+	g_state.elapsedOut = FormatElapsed(g_state.lastElapsedSeconds);
+	g_state.throughputOut = FormatThroughput(g_state.lastSizeBytes, g_state.lastElapsedSeconds);
 	SetControlText(hwnd, 101, g_state.hexOut);
 	SetControlText(hwnd, 102, g_state.b64Out);
 	SetControlText(hwnd, 103, g_state.sizeOut);
 	SetControlText(hwnd, 104, g_state.elapsedOut);
 	SetControlText(hwnd, 105, g_state.throughputOut);
+}
+
+static void StartHash(HWND hwnd) {
+	if (g_state.selectedPath.empty() || g_state.isHashing) return;
+	g_state.isHashing = true;
+	g_state.hasDigest = false;
+	std::wstring path = g_state.selectedPath;
+	std::thread([hwnd, path]() {
+		HashResult *res = new HashResult();
+		res->path = path;
+		std::string err;
+		if (!hashcore::compute_sha256_streamed(path, res->digest, res->sizeBytes, res->elapsedSeconds, err)) {
+			res->success = false;
+			res->error = err;
+		} else {
+			res->success = true;
+		}
+		PostMessageW(hwnd, WM_HASH_DONE, 0, (LPARAM)res);
+	}).detach();
 }
 
 static void BrowseFile(HWND hwnd) {
@@ -159,7 +181,7 @@ static void BrowseFile(HWND hwnd) {
 	if (GetOpenFileNameW(&ofn)) {
 		g_state.selectedPath = path;
 		SetControlText(hwnd, 100, g_state.selectedPath);
-		DoHash(hwnd);
+		StartHash(hwnd);
 	}
 }
 
@@ -220,7 +242,11 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 			SetControlText(hwnd, 105, L"");
 		} else if (id == 203) { // Uppercase toggle
 			g_state.uppercaseHex = (SendMessageW((HWND)lParam, BM_GETCHECK, 0, 0) == BST_CHECKED);
-			if (!g_state.hexOut.empty()) DoHash(hwnd);
+			if (g_state.hasDigest) {
+				std::string hex = hashcore::to_hex(g_state.lastDigest, g_state.uppercaseHex);
+				g_state.hexOut = Utf8ToWide(hex);
+				SetControlText(hwnd, 101, g_state.hexOut);
+			}
 		} else if (id == 204) { // Copy HEX
 			CopyToClipboard(hwnd, g_state.hexOut);
 		} else if (id == 205) { // Copy Base64
@@ -234,9 +260,26 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 		if (DragQueryFileW(hDrop, 0, path, MAX_PATH)) {
 			g_state.selectedPath = path;
 			SetControlText(hwnd, 100, g_state.selectedPath);
-			DoHash(hwnd);
+			StartHash(hwnd);
 		}
 		DragFinish(hDrop);
+		return 0;
+	}
+	case WM_HASH_DONE: {
+		HashResult *res = (HashResult*)lParam;
+		g_state.isHashing = false;
+		if (res) {
+			if (res->success) {
+				g_state.lastDigest = res->digest;
+				g_state.lastSizeBytes = res->sizeBytes;
+				g_state.lastElapsedSeconds = res->elapsedSeconds;
+				g_state.hasDigest = true;
+				ApplyOutputs(hwnd);
+			} else {
+				MessageBoxW(hwnd, Utf8ToWide(res->error).c_str(), L"Error", MB_ICONERROR);
+			}
+			delete res;
+		}
 		return 0;
 	}
 	case WM_CTLCOLORSTATIC: {
