@@ -133,16 +133,17 @@ static std::wstring FormatNumberWithCommas(double value, int decimals) {
 }
 
 static std::wstring FormatSize(uint64_t bytes) {
-	const double b = (double)bytes;
-	if (b >= 1e9) {
-		double v = b / 1e9;
-		return FormatNumberWithCommas(v, 2) + L" GB";
-	} else if (b >= 1e6) {
-		double v = b / 1e6;
-		return FormatNumberWithCommas(v, 2) + L" MB";
-	} else {
-		return InsertThousandsSeparators(std::to_wstring(bytes)) + L" bytes";
+	static const wchar_t *units[] = {L"bytes", L"KB", L"MB", L"GB", L"TB", L"PB"};
+	double value = (double)bytes;
+	int unit = 0;
+	while (value >= 1000.0 && unit < 5) {
+		value /= 1000.0;
+		++unit;
 	}
+	if (unit == 0) {
+		return InsertThousandsSeparators(std::to_wstring((uint64_t)value)) + L" bytes";
+	}
+	return FormatNumberWithCommas(value, 2) + L" " + units[unit];
 }
 
 static std::wstring FormatElapsed(double seconds) {
@@ -161,18 +162,15 @@ static std::wstring FormatElapsed(double seconds) {
 }
 
 static std::wstring FormatThroughput(uint64_t bytes, double seconds) {
-	if (seconds <= 0.0) return L"0 KB/s";
-	double bps = (double)bytes / seconds; // bytes per second
-	if (bps >= 1e9) {
-		double v = bps / 1e9;
-		return FormatNumberWithCommas(v, 2) + L" GB/s";
-	} else if (bps >= 1e6) {
-		double v = bps / 1e6;
-		return FormatNumberWithCommas(v, 2) + L" MB/s";
-	} else {
-		double v = bps / 1e3;
-		return FormatNumberWithCommas(v, 2) + L" KB/s";
+	if (seconds <= 0.0) return L"0 B/s";
+	double perSec = (double)bytes / seconds; // bytes per second
+	static const wchar_t *units[] = {L"B/s", L"KB/s", L"MB/s", L"GB/s", L"TB/s", L"PB/s"};
+	int unit = 0;
+	while (perSec >= 1000.0 && unit < 5) {
+		perSec /= 1000.0;
+		++unit;
 	}
+	return FormatNumberWithCommas(perSec, 2) + L" " + units[unit];
 }
 
 static void ApplyOutputs(HWND hwnd) {
