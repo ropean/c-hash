@@ -27,10 +27,12 @@ struct UiState {
 	hashcore::Sha256Digest lastDigest{};
 	uint64_t lastSizeBytes = 0;
 	double lastElapsedSeconds = 0.0;
+	std::wstring lastCompletedPath;
 };
 
 static UiState g_state{};
 static const UINT WM_HASH_DONE = WM_APP + 1;
+static const UINT WM_HASH_PROGRESS = WM_APP + 2;
 
 struct HashResult {
 	bool success = false;
@@ -51,6 +53,8 @@ static void SetUiBusy(HWND hwnd, bool busy) {
 		HWND h = GetDlgItem(hwnd, id);
 		if (h) EnableWindow(h, busy ? FALSE : TRUE);
 	}
+	HWND cancelBtn = GetDlgItem(hwnd, 206);
+	if (cancelBtn) EnableWindow(cancelBtn, busy ? TRUE : FALSE);
 	if (busy) {
 		SetWindowTextW(hwnd, L"c-hash — Hashing...");
 	} else {
@@ -178,17 +182,29 @@ static void ApplyOutputs(HWND hwnd) {
 	SetControlText(hwnd, 105, g_state.throughputOut);
 }
 
+static std::atomic<bool> g_cancel{false};
+
 static void StartHash(HWND hwnd) {
 	if (g_state.selectedPath.empty() || g_state.isHashing) return;
 	g_state.isHashing = true;
 	g_state.hasDigest = false;
 	std::wstring path = g_state.selectedPath;
 	SetUiBusy(hwnd, true);
+	g_cancel.store(false);
 	std::thread([hwnd, path]() {
 		HashResult *res = new HashResult();
 		res->path = path;
 		std::string err;
-		if (!hashcore::compute_sha256_streamed(path, res->digest, res->sizeBytes, res->elapsedSeconds, err)) {
+		auto progress = [](uint64_t processed, uint64_t total, void *user){
+			HWND h = (HWND)user;
+			if (total == 0) {
+				PostMessageW(h, WM_HASH_PROGRESS, (WPARAM)0, 0);
+				return;
+			}
+			uint64_t pct100 = (processed * 10000ULL) / total; // hundredths
+			PostMessageW(h, WM_HASH_PROGRESS, (WPARAM)pct100, 0);
+		};
+		if (!hashcore::compute_sha256_streamed_with_progress(path, res->digest, res->sizeBytes, res->elapsedSeconds, err, &g_cancel, progress, hwnd)) {
 			res->success = false;
 			res->error = err;
 		} else {
@@ -214,6 +230,19 @@ static void BrowseFile(HWND hwnd) {
 	}
 }
 
+static WNDPROC g_editOldProc = nullptr;
+static LRESULT CALLBACK EditSubclassProc(HWND hEdit, UINT msg, WPARAM wParam, LPARAM lParam) {
+	if (msg == WM_KEYDOWN && wParam == VK_RETURN) {
+		HWND hwnd = GetParent(hEdit);
+		wchar_t buf[1024];
+		GetWindowTextW(hEdit, buf, 1024);
+		g_state.selectedPath = buf;
+		StartHash(hwnd);
+		return 0;
+	}
+	return CallWindowProcW(g_editOldProc, hEdit, msg, wParam, lParam);
+}
+
 static void CopyToClipboard(HWND hwnd, const std::wstring &text) {
 	if (!OpenClipboard(hwnd)) return;
 	EmptyClipboard();
@@ -232,10 +261,13 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 	switch (msg) {
 	case WM_CREATE: {
 		CreateWindowW(L"STATIC", L"Path:", WS_CHILD | WS_VISIBLE, 10, 10, 80, 20, hwnd, nullptr, nullptr, nullptr);
-		CreateWindowW(L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL, 100, 10, 470, 24, hwnd, (HMENU)100, nullptr, nullptr);
+		HWND hEdit = CreateWindowW(L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL, 100, 10, 470, 24, hwnd, (HMENU)100, nullptr, nullptr);
 		CreateWindowW(L"BUTTON", L"Browse", WS_CHILD | WS_VISIBLE, 580, 10, 60, 24, hwnd, (HMENU)200, nullptr, nullptr);
 		CreateWindowW(L"BUTTON", L"Clear", WS_CHILD | WS_VISIBLE, 650, 10, 60, 24, hwnd, (HMENU)202, nullptr, nullptr);
 		CreateWindowW(L"BUTTON", L"Uppercase HEX", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 100, 44, 130, 20, hwnd, (HMENU)203, nullptr, nullptr);
+		CreateWindowW(L"BUTTON", L"Cancel", WS_CHILD | WS_VISIBLE, 240, 44, 70, 24, hwnd, (HMENU)206, nullptr, nullptr);
+		// Subclass edit to capture Enter
+		g_editOldProc = (WNDPROC)SetWindowLongPtrW(hEdit, GWLP_WNDPROC, (LONG_PTR)EditSubclassProc);
 
 		CreateWindowW(L"STATIC", L"HEX:", WS_CHILD | WS_VISIBLE, 10, 74, 80, 20, hwnd, nullptr, nullptr, nullptr);
 		CreateWindowW(L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL | ES_READONLY, 100, 74, 550, 24, hwnd, (HMENU)101, nullptr, nullptr);
@@ -280,6 +312,8 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 			CopyToClipboard(hwnd, g_state.hexOut);
 		} else if (id == 205) { // Copy Base64
 			CopyToClipboard(hwnd, g_state.b64Out);
+		} else if (id == 206) { // Cancel
+			if (g_state.isHashing) g_cancel.store(true);
 		}
 		return 0;
 	}
@@ -298,6 +332,15 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 		DragFinish(hDrop);
 		return 0;
 	}
+	case WM_HASH_PROGRESS: {
+		// percent hundredths in WPARAM (0..10000)
+		unsigned long p100 = (unsigned long)wParam;
+		double percent = (double)p100 / 100.0;
+		wchar_t buf[128];
+		swprintf(buf, 128, L"c-hash — Hashing... %.2f%%", percent);
+		SetWindowTextW(hwnd, buf);
+		return 0;
+	}
 	case WM_HASH_DONE: {
 		HashResult *res = (HashResult*)lParam;
 		g_state.isHashing = false;
@@ -307,9 +350,17 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 				g_state.lastSizeBytes = res->sizeBytes;
 				g_state.lastElapsedSeconds = res->elapsedSeconds;
 				g_state.hasDigest = true;
+				g_state.lastCompletedPath = res->path;
 				ApplyOutputs(hwnd);
 			} else {
-				MessageBoxW(hwnd, Utf8ToWide(res->error).c_str(), L"Error", MB_ICONERROR);
+				if (res->error != "Cancelled") {
+					MessageBoxW(hwnd, Utf8ToWide(res->error).c_str(), L"Error", MB_ICONERROR);
+				} else {
+					if (!g_state.lastCompletedPath.empty()) {
+						g_state.selectedPath = g_state.lastCompletedPath;
+						SetControlText(hwnd, 100, g_state.selectedPath);
+					}
+				}
 			}
 			delete res;
 		}
