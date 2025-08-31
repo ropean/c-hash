@@ -6,6 +6,11 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Treat sources as UTF-8 on MSVC to avoid code page issues
+if(MSVC)
+    add_compile_options(/utf-8)
+endif()
+
 add_library(hashcore STATIC
     src/hash.cpp
     src/hash.hpp
