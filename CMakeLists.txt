@@ -11,24 +11,16 @@ add_library(hashcore STATIC
     src/hash.hpp
 )
 
-add_executable(c-hash
-    src/main.cpp
-)
-target_link_libraries(c-hash PRIVATE hashcore)
-set_target_properties(c-hash PROPERTIES OUTPUT_NAME "c-hash-cli")
+## CLI target removed per request
 
 if(WIN32)
     # Link bcrypt on Windows (name is lowercase for MinGW)
     target_link_libraries(hashcore PUBLIC bcrypt)
 endif()
 
-target_compile_definitions(c-hash PRIVATE NOMINMAX)
 target_compile_definitions(hashcore PUBLIC NOMINMAX)
 
-# For MinGW, enable wide-char entry point
-if(WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    target_link_options(c-hash PRIVATE -municode)
-endif()
+# For MinGW, enable wide-char entry point (GUI target handled below)
 
 # GUI target (Win32)
 if(WIN32)
@@ -57,7 +49,6 @@ if(WIN32 AND APP_ICON AND EXISTS "${APP_ICON}")
         ${RC_OUT}
         @ONLY
     )
-    target_sources(c-hash PRIVATE ${RC_OUT})
     if(TARGET c-hash-gui)
         target_sources(c-hash-gui PRIVATE ${RC_OUT})
     endif()
