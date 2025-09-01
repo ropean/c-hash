@@ -11,7 +11,7 @@ namespace hashcore {
 
 namespace fs = std::filesystem;
 
-constexpr size_t HASH_BUFFER_SIZE = 1 * 1024 * 1024;  // 1 MB
+constexpr size_t HASH_BUFFER_SIZE = 2 * 1024 * 1024;  // 2 MB
 
 struct Sha256Digest {
 	std::array<unsigned char, 32> bytes{};
