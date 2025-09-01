@@ -50,8 +50,7 @@ bool compute_sha256_streamed(const fs::path &file_path, Sha256Digest &out_digest
 		return false;
 	}
 
-	const size_t buffer_size = 1 * 1024 * 1024;
-	std::vector<unsigned char> buffer(buffer_size);
+	std::vector<unsigned char> buffer(HASH_BUFFER_SIZE);
 
 	LARGE_INTEGER start{}, end{};
 	QueryPerformanceCounter(&start);
@@ -153,8 +152,7 @@ bool compute_sha256_streamed_with_progress(const fs::path &file_path,
 		return false;
 	}
 
-	const size_t buffer_size = 1 * 1024 * 1024;
-	std::vector<unsigned char> buffer(buffer_size);
+	std::vector<unsigned char> buffer(HASH_BUFFER_SIZE);
 
 	LARGE_INTEGER start{}, end{};
 	QueryPerformanceCounter(&start);
